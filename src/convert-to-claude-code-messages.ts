@@ -169,6 +169,31 @@ function parseFilePart(part: FileLikePart): { content?: SDKUserContentPart; warn
  * Converts AI SDK prompt format to Claude Code SDK message format.
  * Handles system prompts, user messages, assistant responses, and tool interactions.
  *
+ * ## Message History Approach
+ *
+ * The Anthropic Agent SDK only supports on-disk, file-based message history — it does
+ * not accept structured message arrays directly.  This function works around that
+ * limitation by serializing the entire AI SDK message array into a single formatted
+ * prompt string.  The conversation is formatted as:
+ *
+ * ```
+ * [System prompt if present]
+ *
+ * Human: [user message 1]
+ *
+ * Assistant: [assistant response 1]
+ *
+ * Human: [user message 2]
+ * ```
+ *
+ * Because the full conversation history is embedded in the prompt, each SDK call is
+ * self-contained and does **not** rely on on-disk session resumption for context
+ * continuity.  The provider intentionally avoids auto-resuming previous sessions to
+ * prevent the model from seeing the same history twice (once from the prompt and once
+ * from the on-disk session).  Users who need session-level features (file checkpoints,
+ * tool state) can explicitly set `settings.resume` with the `sessionId` returned in
+ * `providerMetadata`.
+ *
  * @param prompt - The AI SDK prompt containing messages
  * @returns An object containing the formatted message prompt and optional system prompt
  *

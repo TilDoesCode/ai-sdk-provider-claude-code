@@ -693,7 +693,17 @@ export class ClaudeCodeLanguageModel implements LanguageModelV3 {
   }
 
   private getEffectiveResume(sdkOptions?: Partial<Options>): string | undefined {
-    return sdkOptions?.resume ?? this.settings.resume ?? this.sessionId;
+    // Only resume when explicitly requested via sdkOptions or settings.
+    // We intentionally do NOT fall back to this.sessionId here because the AI SDK
+    // always sends the full message array on every call. The provider converts that
+    // array into a formatted prompt string (see convertToClaudeCodeMessages), so the
+    // model already receives the complete conversation context. Auto-resuming a
+    // previous on-disk session would cause the model to see the history twice — once
+    // from the resumed session and once from the prompt — leading to context duplication.
+    // Users who need session-level features (file checkpoints, tool state) can
+    // explicitly set settings.resume or sdkOptions.resume with the sessionId returned
+    // in providerMetadata.
+    return sdkOptions?.resume ?? this.settings.resume;
   }
 
   private extractTextAndThinking(content: unknown): { text: string; thinking: string[] } {
@@ -936,7 +946,7 @@ export class ClaudeCodeLanguageModel implements LanguageModelV3 {
     const opts: Partial<Options> & Record<string, unknown> = {
       model: this.getModel(),
       abortController,
-      resume: effectiveResume ?? this.settings.resume ?? this.sessionId,
+      resume: effectiveResume,
       pathToClaudeCodeExecutable: this.settings.pathToClaudeCodeExecutable,
       maxTurns: this.settings.maxTurns,
       maxThinkingTokens: this.settings.maxThinkingTokens,

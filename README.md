@@ -269,6 +269,22 @@ console.log(result.object); // Matches the schema above
 - 🔧 Tool management (MCP servers, permissions)
 - 🧩 Callbacks (hooks, canUseTool)
 
+### How Multi-turn Conversations Work
+
+The Anthropic Agent SDK only supports on-disk, file-based message history — it does not accept structured message arrays directly. This provider works around that limitation by serializing the entire AI SDK message array into a single formatted prompt string on every call:
+
+    [System prompt]
+
+    Human: [user message 1]
+
+    Assistant: [assistant response 1]
+
+    Human: [user message 2]
+
+Because the full conversation history is embedded in the prompt, each SDK call is self-contained. The provider does **not** auto-resume previous on-disk sessions — doing so would cause the model to see the same history twice (once from the resumed session and once from the prompt). If you need session-level features such as file checkpoints or tool state, set `settings.resume` explicitly with the `sessionId` returned in `providerMetadata['claude-code']`.
+
+See [`examples/conversation-history.ts`](./examples/conversation-history.ts) for a complete multi-turn example.
+
 ## Agent SDK Options (Advanced)
 
 This provider exposes Agent SDK options directly. Key options include:

@@ -575,6 +575,67 @@ describe('ClaudeCodeLanguageModel', () => {
       expect(promptSessionId).toBe('sdk-session');
     });
 
+    it('should not auto-resume from stored sessionId on subsequent calls', async () => {
+      // The AI SDK always sends the full message array on every call.
+      // The provider converts that array into a formatted prompt string that already
+      // contains the complete conversation context. Auto-resuming from a stored
+      // sessionId would cause the model to see the history twice (once from the
+      // on-disk session, once from the prompt), so resume should only be set when
+      // explicitly requested via settings.resume or sdkOptions.resume.
+      const modelInstance = new ClaudeCodeLanguageModel({
+        id: 'sonnet',
+        settings: {} as any,
+      });
+
+      // First call returns a session_id
+      const mockResponse1 = {
+        async *[Symbol.asyncIterator]() {
+          yield {
+            type: 'result',
+            subtype: 'success',
+            session_id: 'session-from-first-call',
+            usage: { input_tokens: 5, output_tokens: 5 },
+          };
+        },
+      };
+      vi.mocked(mockQuery).mockReturnValue(mockResponse1 as any);
+
+      await modelInstance.doGenerate({
+        prompt: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
+      } as any);
+
+      // Verify first call had no resume
+      const call1 = vi.mocked(mockQuery).mock.calls[0]?.[0] as any;
+      expect(call1?.options?.resume).toBeUndefined();
+
+      // Second call — the model still has the stored sessionId but should not auto-resume
+      const mockResponse2 = {
+        async *[Symbol.asyncIterator]() {
+          yield {
+            type: 'result',
+            subtype: 'success',
+            session_id: 'session-from-second-call',
+            usage: { input_tokens: 10, output_tokens: 10 },
+          };
+        },
+      };
+      vi.mocked(mockQuery).mockReturnValue(mockResponse2 as any);
+
+      await modelInstance.doGenerate({
+        prompt: [
+          { role: 'user', content: [{ type: 'text', text: 'hello' }] },
+          { role: 'assistant', content: [{ type: 'text', text: 'hi there' }] },
+          { role: 'user', content: [{ type: 'text', text: 'follow up' }] },
+        ],
+      } as any);
+
+      const call2 = vi.mocked(mockQuery).mock.calls[1]?.[0] as any;
+      expect(call2?.options?.resume).toBeUndefined();
+
+      // Verify the sessionId is still available in provider metadata
+      // (it's tracked for user reference, just not used for auto-resume)
+    });
+
     it('should ignore blocked sdkOptions fields', async () => {
       const externalAbortController = new AbortController();
       const modelWithBlocked = new ClaudeCodeLanguageModel({

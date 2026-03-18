@@ -632,8 +632,14 @@ describe('ClaudeCodeLanguageModel', () => {
       const call2 = vi.mocked(mockQuery).mock.calls[1]?.[0] as any;
       expect(call2?.options?.resume).toBeUndefined();
 
-      // Verify the sessionId is still available in provider metadata
-      // (it's tracked for user reference, just not used for auto-resume)
+      // Verify the sessionId is still tracked in provider metadata
+      // (it's available for user reference, just not used for auto-resume)
+      const result2 = await modelInstance.doGenerate({
+        prompt: [{ role: 'user', content: [{ type: 'text', text: 'third call' }] }],
+      } as any);
+      expect(result2.providerMetadata?.['claude-code']?.sessionId).toBe(
+        'session-from-second-call'
+      );
     });
 
     it('should ignore blocked sdkOptions fields', async () => {
